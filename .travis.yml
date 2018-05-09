@@ -1,5 +1,8 @@
 language: go
 
+#TODO: remove
+go_import_path: github.com/src-d/ci
+
 go:
   - 1.10.x
 

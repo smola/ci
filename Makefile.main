@@ -23,6 +23,10 @@ DOCKER_PUSH_LATEST ?=
 DOCKER_OS ?= $(shell docker version -f "{{.Server.Os}}")
 DOCKER_ARCH ?= $(shell docker version -f "{{.Server.Arch}}")
 
+# Backend services
+POSTGRESQL_VERSION ?=
+RABBITMQ_VERSION ?=
+
 # Checking mandatory variables
 ifndef PROJECT
 $(error ERROR! The PROJECT variable cannot be empty)
@@ -33,6 +37,7 @@ WORKDIR := $(PWD)
 BUILD_PATH := $(WORKDIR)/build
 BIN_PATH := $(BUILD_PATH)/bin
 BRANCH ?= $(shell git rev-parse --abbrev-ref HEAD)
+CI_PATH ?= $(WORKDIR)/.ci
 
 # Build information
 BUILD ?= $(shell date +"%m-%d-%Y_%H_%M_%S")
@@ -46,6 +51,9 @@ ifeq ($(TRAVIS), true)
 	WORKDIR := $(TRAVIS_BUILD_DIR)
 	BUILD_PATH := $(WORKDIR)/build
 	VERSION := $(TRAVIS_BRANCH)
+	ifeq ($(TRAVIS_OS_NAME), linux)
+		IS_DEFAULT_BUILD ?= true
+	endif
 endif
 
 # Drone CI
@@ -94,6 +102,9 @@ COVERAGE_MODE = atomic
 PACKAGES = $(shell go list ./... | grep -v '/vendor/')
 
 # Rules
+
+.SUFFIXES:
+
 dependencies: $(DEPENDENCIES)
 	$(GOGET) -t ./...
 
@@ -204,10 +215,23 @@ no-changes-in-commit:
 		exit 2; \
 	fi
 
+export POSTGRESQL_VERSION RABBITMQ_VERSION
+ci-install:
+	$(CI_PATH)/scripts/install_services.sh
+
+ifeq ($(IS_DEFAULT_BUILD),true)
+ci-script: | test-coverage packages
+	@echo
+else
+ci-script: test
+	@echo
+endif
+
 .PHONY: dependencies $(DEPENDENCIES) \
 		build $(COMMANDS) \
 		test test-race test-coverage \
 		docker-login docker-validate docker-build docker-push \
 		packages \
 		clean \
-		no-changes-in-commit
+		no-changes-in-commit \
+		ci-install ci-script

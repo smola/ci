@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xe
+set -e
 
 MAKE=make
 if [[ ! -z ${APPVEYOR} ]]; then
@@ -7,6 +7,11 @@ if [[ ! -z ${APPVEYOR} ]]; then
 fi
 
 EXAMPLES="examples/basic"
+
+MAKE=make
+if [[ ! -z ${APPVEYOR} ]]; then
+	MAKE=mingw32-make
+fi
 
 for example in ${EXAMPLES} ; do
 	echo "Running $example"
