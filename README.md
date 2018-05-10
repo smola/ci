@@ -1,32 +1,42 @@
 # source{d} CI
 
-This project contains the common CI configuration for all source{d} Go projects, including the following functionalities:
+Simple build system to run continuous integration (CI) tasks on source{d} Go projects. Based on [GNU Make](https://www.gnu.org/software/make/).
 
+## Features
+
+* Build Go binaries.
+* Run tests, optionally with coverage and [codecov](https://codecov.io/) integration.
 * Automatic docker image upload on tag. It will upload the image to `$(DOCKER_ORG)/$(PROJECT)` on the given `DOCKER_REGISTRY`.
 * Automatic upload of built binaries to GitHub releases on tag.
-* Tests with coverage (using codecov.io).
+* Full [Travis CI] support on Linux and macOS.
+* Partial Windows support on [Appveyor](https://www.appveyor.com/).
+* Partial Linux support on [Drone](https://drone.io/).
 
-Right now, this has only been tested with TravisCI.
+## Getting Started
 
-- [Makefile.main](https://github.com/src-d/ci/tree/master/examples/Makefile.main): a common Makefile that should be included in all source{d}'s Go projects. Just set up some variables:
-  - **PROJECT**: the project's name (mandatory).
-  - **COMMANDS**: packages and subpackages to be compiled as binaries (mandatory).
-  - **DOCKERFILES**: dockerfiles presents in the project (optional).
+### Makefile
 
-- [.travis.yml](https://github.com/src-d/ci/tree/master/examples/.travis.yml): config file used by TravisCI to create the build and such. Ideally, it's just necessary to specify the CODECOV_TOKEN and the proper project's name under the deploy section.
+The main entrypoint for CI is a `Makefile` in the top-level directory of y our project. This `Makefile` requires minimal setup and delegates most logic to src-d/ci.
 
-Use the files under [examples](https://github.com/src-d/ci/tree/master/examples) as a template.
+You will need to setup some variables to get basic functionality working:
 
-You will need to configure the following environment variables and make them available during the build process:
+* `PROJECT`: the project's name (mandatory).
+* `COMMANDS`: packages and subpackages to be compiled as binaries (optional).
+* `DOCKERFILES`: dockerfiles to be built (optional).
 
-* `DOCKER_ORG`: docker organisation name.
-* `DOCKER_USERNAME`: username of the registry account.
-* `DOCKER_PASSWORD`: password of the registry account.
-* `DOCKER_REGISTRY`: docker registry where images will be pushed.
+You can use the example [`Makefile`](https://github.com/src-d/ci/blob/v1/examples/basic/Makefile) as a template for new projects.
 
-Also, for publishing to GitHub, you will need to provide a GitHub API key.
+### Travis CI
 
-For that, in travis, you can use the `env`. If your project is public, make sure to use [secrets](https://docs.travis-ci.com/user/encryption-keys/).
+Our main CI provider is Travis CI. It is used to run both Linux and macOS builds.
+
+You can use the example [`.travis.yml`](https://github.com/src-d/ci/blob/v1/examples/basic/.travis.yml) as a template for new projects.
+
+## Docker
+
+In order to push Docker images, you need to setup credentials with the environment variables `DOCKER_USERNAME` and `DOCKER_REGISTRY`. When using Travis, you should define them as [secret environment variables](https://docs.travis-ci.com/user/environment-variables/#Defining-Variables-in-Repository-Settings).
+
+You can customize the Docker registry and organization with the `DOCKER_REGISTRY` and `DOCKER_ORG`, which default to `docker.io` and `src-d` respectively.
 
 ## Tasks
 
@@ -36,7 +46,7 @@ There are thee rules available for testing:
 
 * `test`: regular execution of the tests
 * `test-race` : execute the tests with the race detector enabled
-* `test-coverage`: execute the tests and get coverage. This rule generates a `coverage.txt` file that can be uploaded to codecov.io using the `codecov` rule.
+* `test-coverage`: execute the tests and get coverage. This rule generates a `coverage.txt` and uploads it to codecov.io.
 
 ### Building packages
 
@@ -67,6 +77,9 @@ docker images. The images are tagged with the current value of `VERSION`. If
 `DOCKER_PUSH_LATEST` is provided with any value, a `latest` tag is created and
 pushed too.
 
+When writing your `Dockerfile` you can find the compiled binaries at
+`$(BUILD_PATH)/bin` directory. E.g.: `ADD build/bin /bin`
+
 ## Notes
 
 ### Version calculation
@@ -75,11 +88,6 @@ The `VERSION` variable is calculated based on the current git commit, plus a
 `-dirty` flag, if the worktree isn't clean. Example: `dev-01eda91-dirty`. If the
 environment is Travis, the `TRAVIS_BRANCH` is used as `VERSION`. The variable is
 set if it wasn't set previously.
-
-### Writing your Dockerfiles
-
-When writing your `Dockerfiles` you can find the compiled binaries at
-`$(BUILD_PATH)/bin` directory. E.g.: `ADD build/bin /bin`
 
 ### Custom build parameters
 
