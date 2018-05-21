@@ -23,14 +23,11 @@ script:
 before_deploy:
   - make packages
 
-deploy:
-  provider: releases
-  api_key: $GITHUB_TOKEN
-  file_glob: true
-  file: build/*.tar.gz
-  skip_cleanup: true
-  on:
-    tags: true
-
-after_deploy:
-  - make docker-push
+jobs:
+  include:
+    - stage: deploy
+      if: tag IS present
+      services: docker
+      install: true
+      before_script: true
+      script: ci-deploy

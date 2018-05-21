@@ -46,6 +46,8 @@ ifeq ($(TRAVIS), true)
 	WORKDIR := $(TRAVIS_BUILD_DIR)
 	BUILD_PATH := $(WORKDIR)/build
 	VERSION := $(TRAVIS_BRANCH)
+	GITHUB_OWNER := $(firstword $(subst /, ,$(TRAVIS_REPO_SLUG)))
+	GITHUB_REPO := $(lastword $(subst /, ,$(TRAVIS_REPO_SLUG)))
 endif
 
 # Drone CI
@@ -59,7 +61,8 @@ endif
 
 # Packages content
 PKG_OS ?= darwin linux
-PKG_ARCH = amd64
+PKG_ARCH ?= amd64
+TAR_VERSION = $(subst /,-,$(VERSION))
 
 # LD_FLAGS to be use at `go build` calls.
 LD_FLAGS ?= -X main.version=$(VERSION) -X main.build=$(BUILD) -X main.commit=$(COMMIT)
@@ -187,8 +190,7 @@ packages: build
 	@cd $(BUILD_PATH); \
 	for os in $(PKG_OS); do \
 		for arch in $(PKG_ARCH); do \
-			TAR_VERSION=`echo $(VERSION) | tr "/" "-"`; \
-			tar -cvzf $(PROJECT)_$${TAR_VERSION}_$${os}_$${arch}.tar.gz $(PROJECT)_$${os}_$${arch}/; \
+			tar -cvzf $(PROJECT)_$(TAR_VERSION)_$${os}_$${arch}.tar.gz $(PROJECT)_$${os}_$${arch}/; \
 		done; \
 	done
 
@@ -205,10 +207,31 @@ no-changes-in-commit:
 		exit 2; \
 	fi
 
+github-release:
+	set -e; \
+	go get github.com/itchio/gothub; \
+	export GITHUB_TOKEN=$(GITHUB_TOKEN); \
+	export GITHUB_USER=$(GITHUB_OWNER); \
+	export GITHUB_REPO=$(GITHUB_REPO); \
+	if ! gothub info -t $(VERSION) &> /dev/null; then \
+		gothub release -t $(VERSION); \
+	fi; \
+	for os in $(PKG_OS); do \
+		for arch in $(PKG_ARCH); do \
+			FILE="$(PROJECT)_$(TAR_VERSION)_$${os}_$${arch}.tar.gz"; \
+			gothub upload -t $(VERSION) -n $${FILE} -f "$(BUILD_PATH)/$${FILE}"; \
+		done; \
+	done
+
+ci-deploy: | packages github-release docker-push
+	@echo
+
 .PHONY: dependencies $(DEPENDENCIES) \
 		build $(COMMANDS) \
 		test test-race test-coverage \
 		docker-login docker-validate docker-build docker-push \
 		packages \
 		clean \
-		no-changes-in-commit
+		no-changes-in-commit \
+		github-release \
+		ci-deploy
